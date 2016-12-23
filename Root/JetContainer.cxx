@@ -241,8 +241,12 @@ JetContainer::JetContainer(const std::string& name, const std::string& detailStr
   //  flavTagHLT
   if( m_infoSwitch.m_flavTagHLT  ) {
     m_vtxOnlineValid     = new  std::vector<float>(); 
-    m_vtxHadDummy        = new  std::vector<float>(); 
-                                              
+    m_vtxHadDummy        = new  std::vector<float>();
+
+    m_bs_online_vx       = new  std::vector<float>(); 
+    m_bs_online_vy       = new  std::vector<float>(); 
+    m_bs_online_vz       = new  std::vector<float>(); 
+    
     m_vtx_offline_x0     = new  std::vector<float>(); 
     m_vtx_offline_y0     = new  std::vector<float>(); 
     m_vtx_offline_z0     = new  std::vector<float>(); 
@@ -571,6 +575,9 @@ JetContainer::~JetContainer()
   if( m_infoSwitch.m_flavTagHLT  ) {
     delete m_vtxOnlineValid     ; 
     delete m_vtxHadDummy        ; 
+    delete m_bs_online_vx       ; 
+    delete m_bs_online_vy       ; 
+    delete m_bs_online_vz       ; 
 
     delete m_vtx_offline_x0     ; 
     delete m_vtx_offline_y0     ; 
@@ -750,6 +757,10 @@ void JetContainer::setTree(TTree *tree, std::string tagger)
   if(m_infoSwitch.m_flavTagHLT)
     {
       connectBranch<float>(tree,"vtxHadDummy",    &m_vtxHadDummy);
+      connectBranch<float>(tree,"bs_online_vx",   &m_bs_online_vx);
+      connectBranch<float>(tree,"bs_online_vy",   &m_bs_online_vy);
+      connectBranch<float>(tree,"bs_online_vz",   &m_bs_online_vz);
+     
       connectBranch<float>(tree,"vtx_offline_x0", &m_vtx_offline_x0);
       connectBranch<float>(tree,"vtx_offline_y0", &m_vtx_offline_y0);
       connectBranch<float>(tree,"vtx_offline_z0", &m_vtx_offline_z0);
@@ -970,7 +981,10 @@ void JetContainer::updateParticle(uint idx, Jet& jet)
   if(m_infoSwitch.m_flavTagHLT)
     {
       if(m_debug) cout << "updating flavTagHLT " << endl;
-      jet.vtxHadDummy                       =m_vtxHadDummy                  ->at(idx);
+      jet.bs_online_vx                      =m_bs_online_vx                  ->at(idx);
+      jet.bs_online_vy                      =m_bs_online_vy                  ->at(idx);
+      jet.bs_online_vz                      =m_bs_online_vz                  ->at(idx);
+      jet.vtxHadDummy                       =m_vtxHadDummy                   ->at(idx);
       jet.vtx_offline_x0                    =m_vtx_offline_x0                  ->at(idx);
       jet.vtx_offline_y0                    =m_vtx_offline_y0                  ->at(idx);
       jet.vtx_offline_z0                    =m_vtx_offline_z0                  ->at(idx);
@@ -1392,6 +1406,9 @@ void JetContainer::setBranches(TTree *tree)
 
     setBranch<float>(tree,"vtxOnlineValid",m_vtxOnlineValid);
     setBranch<float>(tree,"vtxHadDummy"   ,m_vtxHadDummy   );
+    setBranch<float>(tree,"bs_online_vx"   ,m_bs_online_vx   );
+    setBranch<float>(tree,"bs_online_vy"   ,m_bs_online_vy   );
+    setBranch<float>(tree,"bs_online_vz"   ,m_bs_online_vz   );
 
     setBranch<float>(tree,"vtx_offline_x0"     ,m_vtx_offline_x0     );
     setBranch<float>(tree,"vtx_offline_y0"     ,m_vtx_offline_y0     );
@@ -1715,6 +1732,9 @@ void JetContainer::clear()
   if ( m_infoSwitch.m_flavTagHLT  ) {
     m_vtxOnlineValid->clear();
     m_vtxHadDummy->clear();
+    m_bs_online_vx->clear();
+    m_bs_online_vy->clear();
+    m_bs_online_vz->clear();
 
     m_vtx_offline_x0->clear();
     m_vtx_offline_y0->clear();
@@ -1818,6 +1838,7 @@ void JetContainer::FillJet( const xAOD::Jet* jet, const xAOD::Vertex* pv, int pv
 }
 
 void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex* pv, int pvLocation ){
+  if(m_debug) cout << "In JetContainer::FillJet " << endl;
 
   ParticleContainer::FillParticle(particle);
 
@@ -2284,6 +2305,7 @@ void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex*
     }
 
     if(m_infoSwitch.m_svDetails ) {
+      if(m_debug) cout << "Filling m_svDetails " << endl;
 
       /// @brief SV0 : Number of good tracks in vertex
       static SG::AuxElement::ConstAccessor< int   >   sv0_NGTinSvxAcc     ("SV0_NGTinSvx");
@@ -2357,6 +2379,7 @@ void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex*
     }
 
     if(m_infoSwitch.m_ipDetails ) {
+      if(m_debug) cout << "Filling m_ipDetails " << endl;
 
       //
       // IP2D
@@ -2462,23 +2485,48 @@ void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex*
 
 
     if(m_infoSwitch.m_flavTagHLT ) {
-
+      if(m_debug) cout << "Filling m_flavTagHLT " << endl;
       const xAOD::Vertex *online_pvx       = jet->auxdata<const xAOD::Vertex*>("HLTBJetTracks_vtx");
       const xAOD::Vertex *online_pvx_bkg   = jet->auxdata<const xAOD::Vertex*>("HLTBJetTracks_vtx_bkg");
       const xAOD::Vertex *offline_pvx      = jet->auxdata<const xAOD::Vertex*>("offline_vtx");      
 
       if(online_pvx)  m_vtxOnlineValid->push_back(1.0);
       else            m_vtxOnlineValid->push_back(0.0);
+      
+      char hadDummyPV = jet->auxdata< char >("hadDummyPV");
+      if( hadDummyPV == '0')  m_vtxHadDummy->push_back(0.0);
+      if( hadDummyPV == '1')  m_vtxHadDummy->push_back(1.0);
+      if( hadDummyPV == '2')  m_vtxHadDummy->push_back(2.0);
 
-      bool hadDummyPV = (jet->auxdata< char >("hadDummyPV") == '1');
-      if(hadDummyPV)  m_vtxHadDummy->push_back(1.0);
-      else            m_vtxHadDummy->push_back(0.0);
+      static SG::AuxElement::ConstAccessor< float > acc_bs_online_vs ("bs_online_vz");
+      if(acc_bs_online_vs.isAvailable( *jet) ){
+	if(m_debug) cout << "Have bs_online_vz " << endl;
+	float bs_online_vz = jet->auxdata< float >("bs_online_vz");
+	//std::cout << "**bs_online_vz " << bs_online_vz << std::endl;
+	m_bs_online_vz->push_back( bs_online_vz );
 
+	float bs_online_vx = jet->auxdata< float >("bs_online_vx");
+	//std::cout << "**bs_online_vx " << bs_online_vx << std::endl;
+	m_bs_online_vx->push_back( bs_online_vx );
+
+	float bs_online_vy = jet->auxdata< float >("bs_online_vy");
+	//std::cout << "**bs_online_vy " << bs_online_vy << std::endl;
+	m_bs_online_vy->push_back( bs_online_vy );
+      }else{
+	m_bs_online_vz->push_back( -999 );
+	m_bs_online_vx->push_back( -999 );
+	m_bs_online_vy->push_back( -999 );
+      }
+
+      if(m_debug) cout << "Filling m_vtx_offline " << endl;
       m_vtx_offline_x0->push_back( offline_pvx->x() );
       m_vtx_offline_y0->push_back( offline_pvx->y() );
       m_vtx_offline_z0->push_back( offline_pvx->z() );
+      if(m_debug) cout << "Done Filling m_vtx_offline " << endl;
 
+      if(m_debug) cout << "Filling m_vtx_online... " << endl;
       if(online_pvx){
+	if(m_debug) cout << " ... online_pvx valid " << endl;
         m_vtx_online_x0->push_back( online_pvx->x() );
         m_vtx_online_y0->push_back( online_pvx->y() );
         m_vtx_online_z0->push_back( online_pvx->z() );
@@ -2488,8 +2536,9 @@ void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex*
         m_vtx_online_z0->push_back( -999 );
       }
 
-
+      if(m_debug) cout << "Filling m_vtx_online... " << endl;
       if(online_pvx_bkg){
+	if(m_debug) cout << " ...online_pvx_bkg valid " << endl;
         m_vtx_online_bkg_x0->push_back( online_pvx_bkg->x() );
         m_vtx_online_bkg_y0->push_back( online_pvx_bkg->y() );
         m_vtx_online_bkg_z0->push_back( online_pvx_bkg->z() );
@@ -2499,8 +2548,8 @@ void JetContainer::FillJet( const xAOD::IParticle* particle, const xAOD::Vertex*
         m_vtx_online_bkg_z0->push_back( -999 );
       }
 
-    }
-
+    }// m_flavTagHLT
+    if(m_debug) cout << "Done m_flavTagHLT " << endl;
   }
 
 

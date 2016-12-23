@@ -30,7 +30,6 @@ ClassImp(BasicEventSelection)
 
 BasicEventSelection :: BasicEventSelection (std::string className) :
     Algorithm(className),
-    m_PU_default_channel(0),
     m_grl(nullptr),
     m_pileup_tool_handle("CP::PileupReweightingTool/Pileup"),
     m_trigConfTool(nullptr),
@@ -63,7 +62,7 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   m_debug = false;
   m_truthLevelOnly = false;
 
-  // derivation name
+  // override derivation name
   m_derivationName = "";
 
   // Metadata
@@ -95,7 +94,6 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   m_doPUreweighting    = false;
   m_lumiCalcFileNames  = "";
   m_PRWFileNames       = "";
-  m_PU_default_channel = 0;
 
   // Data weight for unprescaling data
   m_savePrescaleDataWeight  = false;
@@ -262,7 +260,13 @@ EL::StatusCode BasicEventSelection :: fileExecute ()
       const xAOD::CutBookkeeper* allEventsCBK(nullptr);
       const xAOD::CutBookkeeper* DxAODEventsCBK(nullptr);
 
-      if ( m_isDerivation ) { Info("fileExecute()","Looking at DAOD made by Derivation Algorithm: %s", m_derivationName.c_str()); }
+      if ( m_isDerivation ) { 
+	if(m_derivationName != ""){
+	  Info("fileExecute()","Override auto config to look at DAOD made by Derivation Algorithm: %s", m_derivationName.c_str()); 
+	}else{
+	  Info("fileExecute()","Will autoconfig to look at DAOD made by Derivation Algorithm."); 
+	}
+      }
 
       int maxCycle(-1);
       for ( const auto& cbk: *completeCBC ) {
@@ -272,10 +276,19 @@ EL::StatusCode BasicEventSelection :: fileExecute ()
 	      maxCycle = cbk->cycle();
 	  }
 	  if ( m_isDerivation ) {
+
+	    if(m_derivationName != ""){
+
 	      if ( cbk->name() == m_derivationName ) {
-		  DxAODEventsCBK = cbk;
-	      }
-	  }
+		DxAODEventsCBK = cbk;
+	      } 
+	      
+	    } else if( cbk->name().find("Kernel") != std::string::npos ){
+	      Info("fileExecute()","Auto config found DAOD made by Derivation Algorithm: %s", cbk->name().c_str()); 
+	      DxAODEventsCBK = cbk;
+	    }
+
+	  } // is derivation
       }
 
       m_MD_initialNevents     = allEventsCBK->nAcceptedEvents();
@@ -560,21 +573,24 @@ EL::StatusCode BasicEventSelection :: initialize ()
       printf( "\t %s \n", lumiCalcFiles.at(i).c_str() );
     }
 
-    RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<CP::PileupReweightingTool>("Pileup"), "Failed to check whether tool already exists in asg::ToolStore" );
-    //RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.makeNew<CP::PileupReweightingTool>("CP::PileupReweightingTool/Pileup"), "Failed to create handle to CP::PileupReweightingTool");
-    RETURN_CHECK("initialize()", ASG_MAKE_ANA_TOOL(m_pileup_tool_handle, CP::PileupReweightingTool), "Could not make the tool");
+    //RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<CP::PileupReweightingTool>("Pileup"), "Failed to check whether tool already exists in asg::ToolStore" );
+    ////RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.makeNew<CP::PileupReweightingTool>("CP::PileupReweightingTool/Pileup"), "Failed to create handle to CP::PileupReweightingTool");
+    //RETURN_CHECK("initialize()", ASG_MAKE_ANA_TOOL(m_pileup_tool_handle, CP::PileupReweightingTool), "Could not make the tool");
+    //
+
+    //tmp jeff
+    ASG_SET_ANA_TOOL_TYPE(m_pileup_tool_handle, CP::PileupReweightingTool);
+    m_pileup_tool_handle.setName("Pileup");
+
+
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("ConfigFiles", PRWFiles), "");
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("LumiCalcFiles", lumiCalcFiles), "");
-    if ( m_PU_default_channel ) {
-      RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DefaultChannel", m_PU_default_channel), "");
-    }
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactor", 1.0/1.09), "Failed to set pileup reweighting data scale factor");
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorUP", 1.0), "Failed to set pileup reweighting data scale factor up");
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorDOWN", 1.0/1.18), "Failed to set pileup reweighting data scale factor down");
     // RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.initialize(), "Failed to properly initialize CP::PileupReweightingTool");
     RETURN_CHECK("BasicEventSelection::retrieve()", m_pileup_tool_handle.retrieve(), "Failed to properly retrieve CP::PileupReweightingTool");
-
-    //m_pileup_tool_handle->EnableDebugging(true);
+//    RETURN_CHECK("BasicEventSelection::retrieve()", asg::ToolStore::put(m_pileup_tool_handle.get()), "Failed to put");
 
   }
   

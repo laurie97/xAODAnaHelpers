@@ -29,6 +29,7 @@ public:
     @brief name of trigger chain to load
    */
   std::string m_trigItem;
+  std::string m_trigItemVeto;
 
   /**
     @brief Do we load a full BJet trigger chain?
@@ -39,6 +40,12 @@ public:
     @brief Do we load a jet trigger chain?
    */
   bool        m_doHLTJet;
+
+  /**
+    @brief Do we read in the HLT tracks?
+   */
+  bool        m_readHLTTracks;
+
 
   /**
     @brief Name of the output container
